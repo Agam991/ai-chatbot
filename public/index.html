@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <title>AI Chatbot</title>
+
+    <!-- Apply the saved theme before first paint to avoid a flash -->
+    <script>
+        try {
+            var t = localStorage.getItem("theme");
+            if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+        } catch (e) {}
+    </script>
+
+    <link rel="preload" href="fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="stylesheet" href="vendor/phosphor/style.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <div class="app">
+
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar" aria-label="Sidebar">
+
+            <div class="sidebar-header">
+                <h2><i class="ph ph-chat-teardrop-text" aria-hidden="true"></i>AI Chatbot</h2>
+
+                <button id="new-chat-btn" class="new-chat-btn" type="button">
+                    <i class="ph ph-plus" aria-hidden="true"></i>
+                    New Chat
+                </button>
+            </div>
+
+            <div class="chat-history">
+                <!-- Chat history will be added later -->
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-footer-text">
+                    <p>AI Chatbot</p>
+                    <span>Powered by OpenRouter</span>
+                </div>
+
+                <button id="theme-btn" class="icon-btn" type="button" aria-label="Switch theme">
+                    <i class="ph ph-moon" aria-hidden="true"></i>
+                </button>
+            </div>
+
+        </aside>
+
+        <div class="scrim" id="scrim"></div>
+
+
+        <!-- Main Chat Area -->
+        <main class="chat-container">
+
+            <!-- Header -->
+            <header class="chat-header">
+                <button id="menu-btn" class="menu-btn icon-btn" type="button"
+                        aria-label="Open sidebar" aria-controls="sidebar" aria-expanded="false">
+                    <i class="ph ph-list" aria-hidden="true"></i>
+                </button>
+
+                <h1>AI Assistant</h1>
+            </header>
+
+
+            <!-- Messages -->
+            <section id="chat-messages" class="chat-messages" aria-live="polite">
+
+                <!-- Welcome message -->
+                <div class="welcome-screen" id="welcome-screen">
+                    <h2>How can I help you?</h2>
+                    <p>Ask me anything.</p>
+
+                    <div class="suggestions">
+                        <button type="button" class="suggestion" data-prompt="Explain how JWT authentication works">
+                            <i class="ph ph-lock-key" aria-hidden="true"></i>
+                            <span>Explain how JWT authentication works</span>
+                        </button>
+                        <button type="button" class="suggestion" data-prompt="Write a debounce function in JavaScript">
+                            <i class="ph ph-code" aria-hidden="true"></i>
+                            <span>Write a debounce function in JavaScript</span>
+                        </button>
+                        <button type="button" class="suggestion" data-prompt="Plan a four week DSA study schedule">
+                            <i class="ph ph-list-checks" aria-hidden="true"></i>
+                            <span>Plan a four week DSA study schedule</span>
+                        </button>
+                        <button type="button" class="suggestion" data-prompt="Help me debug an Express route that returns 500">
+                            <i class="ph ph-bug" aria-hidden="true"></i>
+                            <span>Help me debug an Express route that returns 500</span>
+                        </button>
+                    </div>
+                </div>
+
+            </section>
+
+
+            <!-- Input Area -->
+            <div class="input-area">
+
+                <form id="chat-form">
+
+                    <textarea
+                        id="message-input"
+                        placeholder="Message AI Assistant..."
+                        aria-label="Message"
+                        rows="1"
+                    ></textarea>
+
+                    <button type="submit" id="send-btn" aria-label="Send message" disabled>
+                        <i class="ph ph-arrow-up" aria-hidden="true"></i>
+                    </button>
+
+                </form>
+
+                <p class="disclaimer">
+                    AI can make mistakes. Check important information.
+                </p>
+
+            </div>
+
+        </main>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="vendor/hljs/highlight.min.js"></script>
+    <script src="script.js"></script>
+
+</body>
+</html>
