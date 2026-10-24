@@ -1,14 +1,14 @@
-const form = document.getElementById("chat-form");
-const input = document.getElementById("message-input");
-const messages = document.getElementById("chat-messages");
-const sendBtn = document.getElementById("send-btn");
-const newChatBtn = document.getElementById("new-chat-btn");
-const menuBtn = document.getElementById("menu-btn");
-const scrim = document.getElementById("scrim");
-const themeBtn = document.getElementById("theme-btn");
+const $ = id => document.getElementById(id);
+
+const form = $("chat-form");
+const input = $("message-input");
+const messages = $("chat-messages");
+const sendBtn = $("send-btn");
+const menuBtn = $("menu-btn");
+const themeBtn = $("theme-btn");
 
 const root = document.documentElement;
-const welcomeTemplate = document.getElementById("welcome-screen").cloneNode(true);
+const welcomeTemplate = $("welcome-screen").cloneNode(true);
 
 let history = [];
 let controller = null;
@@ -16,29 +16,61 @@ let busy = false;
 let session = 0; // bumped on New Chat so stale requests never touch the UI
 
 
-// SEND MESSAGE
+// ---------- Helpers ----------
+
+function icon(name) {
+    const i = document.createElement("i");
+    i.className = `ph ph-${name}`;
+    i.setAttribute("aria-hidden", "true");
+    return i;
+}
+
+function setLabel(button, iconName, label) {
+    button.replaceChildren(icon(iconName), document.createTextNode(label));
+}
+
+function actionButton(className, iconName, label, onClick) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `action-btn ${className}`;
+    setLabel(button, iconName, label);
+    button.onclick = onClick;
+    return button;
+}
+
+function copyButton(className, getText) {
+    return actionButton(className, "copy", "Copy", async function () {
+        await navigator.clipboard.writeText(getText()).catch(console.error);
+        setLabel(this, "check", "Copied");
+        this.classList.add("is-done");
+        setTimeout(() => {
+            setLabel(this, "copy", "Copy");
+            this.classList.remove("is-done");
+        }, 1500);
+    });
+}
+
+const scrollToBottom = () => (messages.scrollTop = messages.scrollHeight);
+
+
+// ---------- Send / request ----------
 
 form.addEventListener("submit", e => {
     e.preventDefault();
-    if (busy) return;
 
     const text = input.value.trim();
-    if (!text) return;
+    if (busy || !text) return;
 
-    document.getElementById("welcome-screen")?.remove();
-
+    $("welcome-screen")?.remove();
     addMessage("user", text);
     history.push({ role: "user", content: text });
 
     input.value = "";
     resizeInput();
-
     requestReply();
 });
 
-
-// REQUEST REPLY (shared by send, retry and regenerate)
-
+// Shared by send, retry and regenerate
 async function requestReply() {
     const mySession = session;
 
@@ -55,36 +87,24 @@ async function requestReply() {
             body: JSON.stringify({ messages: history }),
             signal: controller.signal
         });
-
         const data = await response.json();
-
         if (!response.ok) throw new Error(data.error);
 
         if (mySession !== session) return;
 
         removeTyping();
-
-        history.push({
-            role: "assistant",
-            content: data.reply
-        });
-
-        addMessage("assistant", data.reply);
+        history.push({ role: "assistant", content: data.result });
+        addMessage("assistant", data.result);
 
     } catch (error) {
         if (mySession !== session) return;
 
         removeTyping();
-
         if (error.name === "AbortError") {
             addMessage("assistant", "Generation stopped.", { variant: "note" });
         } else {
             console.error(error);
-            addMessage(
-                "assistant",
-                "Something went wrong. Check your connection and try again.",
-                { variant: "error" }
-            );
+            addMessage("assistant", "Something went wrong. Check your connection and try again.", { variant: "error" });
         }
 
     } finally {
@@ -100,27 +120,9 @@ async function requestReply() {
 }
 
 
-// ADD MESSAGE
+// ---------- Messages ----------
 
-function icon(name) {
-    const i = document.createElement("i");
-    i.className = `ph ph-${name}`;
-    i.setAttribute("aria-hidden", "true");
-    return i;
-}
-
-function actionButton(className, iconName, label, onClick) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = `action-btn ${className}`;
-    button.append(icon(iconName), document.createTextNode(label));
-    button.onclick = onClick;
-    return button;
-}
-
-function addMessage(role, text, options = {}) {
-    const { variant } = options;
-
+function addMessage(role, text, { variant } = {}) {
     // Only the newest reply can be regenerated
     messages.querySelectorAll(".regenerate-btn").forEach(b => b.remove());
 
@@ -143,7 +145,6 @@ function addMessage(role, text, options = {}) {
 
         if (variant) {
             content.textContent = text;
-
             actions.append(actionButton("retry-btn", "arrow-clockwise", "Retry", () => {
                 if (busy) return;
                 message.remove();
@@ -152,29 +153,32 @@ function addMessage(role, text, options = {}) {
         } else {
             content.innerHTML = marked.parse(text);
             enhanceMarkdown(content);
-
-            actions.append(actionButton("copy-reply-btn", "copy", "Copy", async function () {
-                await copyText(text);
-                flashCopied(this, "Copy");
-            }));
-
-            actions.append(actionButton("regenerate-btn", "arrow-clockwise", "Regenerate", () => {
-                regenerateResponse(message);
-            }));
+            actions.append(
+                copyButton("copy-reply-btn", () => text),
+                actionButton("regenerate-btn", "arrow-clockwise", "Regenerate", () => regenerate(message))
+            );
         }
 
-        content.appendChild(actions);
+        content.append(actions);
     } else {
         content.textContent = text;
     }
 
     message.append(content);
-    messages.appendChild(message);
-    messages.scrollTop = messages.scrollHeight;
+    messages.append(message);
+    scrollToBottom();
+}
+
+function regenerate(message) {
+    if (busy || history.at(-1)?.role !== "assistant") return;
+
+    history.pop();
+    message.remove();
+    requestReply();
 }
 
 
-// MARKDOWN ENHANCEMENTS
+// ---------- Markdown ----------
 
 function enhanceMarkdown(content) {
     content.querySelectorAll("a").forEach(link => {
@@ -186,113 +190,57 @@ function enhanceMarkdown(content) {
         const wrap = document.createElement("div");
         wrap.className = "table-wrap";
         table.replaceWith(wrap);
-        wrap.appendChild(table);
+        wrap.append(table);
     });
 
-    addCodeBlocks(content);
-}
-
-function addCodeBlocks(content) {
     content.querySelectorAll("pre").forEach(pre => {
         const code = pre.querySelector("code");
         if (!code) return;
 
-        if (window.hljs) {
-            try { hljs.highlightElement(code); } catch (e) { /* plain text fallback */ }
-        }
+        try { hljs.highlightElement(code); } catch (e) { /* plain text fallback */ }
 
-        const language = (code.className.match(/language-([\w+-]+)/) || [])[1] || "code";
-
-        const wrap = document.createElement("div");
-        wrap.className = "code-block";
+        const label = document.createElement("span");
+        label.textContent = (code.className.match(/language-([\w+-]+)/) || [])[1] || "code";
 
         const head = document.createElement("div");
         head.className = "code-head";
+        head.append(label, copyButton("copy-btn", () => code.textContent));
 
-        const label = document.createElement("span");
-        label.textContent = language;
-
-        const button = actionButton("copy-btn", "copy", "Copy", async function () {
-            await copyText(code.textContent || "");
-            flashCopied(this, "Copy");
-        });
-
-        head.append(label, button);
-
+        const wrap = document.createElement("div");
+        wrap.className = "code-block";
         pre.replaceWith(wrap);
         wrap.append(head, pre);
     });
 }
 
-async function copyText(text) {
-    try {
-        await navigator.clipboard.writeText(text);
-    } catch (error) {
-        console.error(error);
-    }
-}
 
-function flashCopied(button, original) {
-    button.replaceChildren(icon("check"), document.createTextNode("Copied"));
-    button.classList.add("is-done");
-
-    setTimeout(() => {
-        button.replaceChildren(icon("copy"), document.createTextNode(original));
-        button.classList.remove("is-done");
-    }, 1500);
-}
-
-
-// REGENERATE
-
-function regenerateResponse(message) {
-    if (busy) return;
-    if (history.length < 2) return;
-    if (history[history.length - 1].role !== "assistant") return;
-
-    history.pop();
-    message.remove();
-
-    requestReply();
-}
-
-
-// TYPING INDICATOR (skeleton)
+// ---------- Typing indicator and send button ----------
 
 function showTyping() {
     const typing = document.createElement("div");
-
     typing.id = "typing-indicator";
     typing.className = "message enter";
     typing.setAttribute("role", "status");
     typing.setAttribute("aria-label", "Generating response");
-
     typing.innerHTML = `
         <div class="message-avatar" aria-hidden="true"><i class="ph ph-chat-teardrop-text"></i></div>
-        <div class="message-content">
-            <div class="skeleton"><span></span><span></span><span></span></div>
-        </div>
-    `;
+        <div class="message-content"><div class="skeleton"><span></span><span></span><span></span></div></div>`;
 
-    messages.appendChild(typing);
-    messages.scrollTop = messages.scrollHeight;
+    messages.append(typing);
+    scrollToBottom();
 
-    setSendIcon("stop", "Stop generating");
+    // While busy, the send button becomes a stop button
+    sendBtn.replaceChildren(icon("stop"));
+    sendBtn.setAttribute("aria-label", "Stop generating");
     sendBtn.disabled = false;
     sendBtn.onclick = () => controller?.abort();
 }
 
-function removeTyping() {
-    document.getElementById("typing-indicator")?.remove();
-}
-
-function setSendIcon(name, label) {
-    sendBtn.replaceChildren(icon(name));
-    sendBtn.setAttribute("aria-label", label);
-}
+const removeTyping = () => $("typing-indicator")?.remove();
 
 function resetSendButton() {
-    setSendIcon("arrow-up", "Send message");
+    sendBtn.replaceChildren(icon("arrow-up"));
+    sendBtn.setAttribute("aria-label", "Send message");
     sendBtn.onclick = null;
     updateSendState();
 }
@@ -302,12 +250,11 @@ function updateSendState() {
 }
 
 
-// TEXTAREA
+// ---------- Input ----------
 
 function resizeInput() {
     input.style.height = "auto";
-    input.style.height =
-        Math.min(input.scrollHeight, 150) + "px";
+    input.style.height = Math.min(input.scrollHeight, 150) + "px";
     updateSendState();
 }
 
@@ -320,9 +267,6 @@ input.addEventListener("keydown", e => {
     }
 });
 
-
-// SUGGESTIONS
-
 messages.addEventListener("click", e => {
     const suggestion = e.target.closest(".suggestion");
     if (!suggestion || busy) return;
@@ -333,14 +277,13 @@ messages.addEventListener("click", e => {
 });
 
 
-// NEW CHAT
+// ---------- New chat ----------
 
-newChatBtn.addEventListener("click", () => {
+$("new-chat-btn").addEventListener("click", () => {
     session++;
     controller?.abort();
     controller = null;
     busy = false;
-
     history = [];
 
     messages.replaceChildren(welcomeTemplate.cloneNode(true));
@@ -351,12 +294,12 @@ newChatBtn.addEventListener("click", () => {
     resizeInput();
     resetSendButton();
 
-    closeSidebar();
+    setSidebar(false);
     input.focus();
 });
 
 
-// SIDEBAR (mobile drawer)
+// ---------- Sidebar (mobile drawer) ----------
 
 function setSidebar(open) {
     document.body.classList.toggle("sidebar-open", open);
@@ -364,28 +307,15 @@ function setSidebar(open) {
     menuBtn.setAttribute("aria-label", open ? "Close sidebar" : "Open sidebar");
 }
 
-function closeSidebar() {
-    setSidebar(false);
-}
-
-menuBtn.addEventListener("click", () => {
-    setSidebar(!document.body.classList.contains("sidebar-open"));
-});
-
-scrim.addEventListener("click", closeSidebar);
-
-document.addEventListener("keydown", e => {
-    if (e.key === "Escape") closeSidebar();
-});
+menuBtn.addEventListener("click", () => setSidebar(!document.body.classList.contains("sidebar-open")));
+$("scrim").addEventListener("click", () => setSidebar(false));
+document.addEventListener("keydown", e => e.key === "Escape" && setSidebar(false));
 
 
-// THEME
+// ---------- Theme ----------
 
-const prefersDark = window.matchMedia("(prefers-color-scheme: dark)");
-
-function currentTheme() {
-    return root.dataset.theme || (prefersDark.matches ? "dark" : "light");
-}
+const prefersDark = matchMedia("(prefers-color-scheme: dark)");
+const currentTheme = () => root.dataset.theme || (prefersDark.matches ? "dark" : "light");
 
 function syncThemeButton() {
     const dark = currentTheme() === "dark";
@@ -396,11 +326,7 @@ function syncThemeButton() {
 themeBtn.addEventListener("click", () => {
     const next = currentTheme() === "dark" ? "light" : "dark";
     root.dataset.theme = next;
-
-    try {
-        localStorage.setItem("theme", next);
-    } catch (e) { /* storage unavailable */ }
-
+    try { localStorage.setItem("theme", next); } catch (e) { /* storage unavailable */ }
     syncThemeButton();
 });
 

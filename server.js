@@ -1,69 +1,46 @@
-const express = require("express");
-const dotenv = require("dotenv");
-const axios = require("axios");
+const express = require('express')
+const app = express()
 
-dotenv.config();
+const dotenv = require('dotenv')
+dotenv.config();   // dotenv.config() -> to load secretly from .env file into process.env
 
-const app = express();
-const PORT = 3000;
+app.use(express.json())  //lets the server read JSON request
+app.use(express.static("public")) //serves the files in public/ folder to the browser.
 
-app.use(express.json());
-app.use(express.static("public"));
+const PORT = process.env.PORT
+const { GoogleGenAI } = require("@google/genai");
 
-app.post("/api/chat", async (req, res) => {
-    try {
-        const { messages } = req.body;
-
-        if (!Array.isArray(messages)) {
-            return res.status(400).json({ error: "Messages are required" });
+app.post("/api/chat", async(req,res)=>{
+    // const content = req.body.messages.at(-1).content  //this sends very last msg
+    const content = req.body.messages.map(m => {
+        return {
+            role: m.role === "assistant" ? "model" : "user",   // Gemini calls the assistant "model"
+            parts: [{ text: m.content }]
         }
+    })
 
-        const response = await axios.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            {
-                model: "openrouter/free",
-                max_tokens: 500,
-                messages: [
-                    {
-                        role: "system",
-                        content: `
-You are a helpful AI assistant.
+    const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    const ai = new GoogleGenAI({apiKey: GEMINI_API_KEY});
 
-- Be concise and direct.
-- Focus on useful information.
-- Simple questions: 1-4 sentences.
-- Use short paragraphs or bullet points for explanations.
-- Avoid unnecessary introductions and repetition.
-- Give detailed answers only when requested.
-`
-                    },
-                    ...messages
-                ]
-            },
-            {
-                headers: {
-                    Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-                    "Content-Type": "application/json"
-                }
-            }
-        );
+    const response = await ai.models.generateContent({
+        model: 'gemini-3.5-flash-lite',
+        contents: content,
 
-        res.json({
-            reply: response.data.choices[0].message.content
-        });
+        config: {
+            systemInstruction: "be concise and finish within minimum words if possible",
+            maxOutputTokens: 500,
+        },
+    })
 
-    } catch (error) {
-        console.error(
-            "AI API Error:",
-            error.response?.data || error.message
-        );
+    return res.json({        //make it into objects
+        result: response.text      
+    })
+})
 
-        res.status(500).json({
-            error: "Failed to get response from AI"
-        });
-    }
+app.use((err, req, res, next) => {    //error handling
+    console.error(err);
+    res.status(500).json({ error: "Failed to get reply" });
 });
 
-app.listen(PORT, () => {
-    console.log(`Server running at http://localhost:${PORT}`);
-});
+app.listen(PORT, ()=> console.log(`Server runnning at Port ${process.env.PORT}`))
+    

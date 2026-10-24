@@ -57,3 +57,6 @@ OpenRouter API
 AI Response
    ↓
 Browser
+
+reference-> 
+https://ai.google.dev/gemini-api/docs

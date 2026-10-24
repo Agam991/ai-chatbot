@@ -1,0 +1,6 @@
+npm install @google/genai -> google SDK for Javascript/Typescript
+
+app.post contains API key
+
+reference-> 
+https://ai.google.dev/gemini-api/docs
