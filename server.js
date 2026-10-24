@@ -11,7 +11,7 @@ dotenv.config();   // dotenv.config() -> to load secretly from .env file into pr
 app.use(express.json())  //lets the server read JSON request
 app.use(express.static("public")) //serves the files in public/ folder to the browser.
 
-const PORT = process.env.PORT
+const PORT = process.env.PORT || 7000
 const { GoogleGenAI } = require("@google/genai");
 
 const connectDB = require('./db')
