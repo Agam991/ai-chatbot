@@ -11,6 +11,7 @@ const root = document.documentElement;
 const welcomeTemplate = $("welcome-screen").cloneNode(true);
 
 let history = [];
+let chatId = null;   // MongoDB _id of the open chat (null = new chat)
 let controller = null;
 let busy = false;
 let session = 0; // bumped on New Chat so stale requests never touch the UI
@@ -84,17 +85,20 @@ async function requestReply() {
         const response = await fetch("/api/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ messages: history }),
+            body: JSON.stringify({ chatId, messages: history }),
             signal: controller.signal
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error);
 
-        if (mySession !== session) return;
+        if (mySession !== session) return;   // user clicked New Chat / opened another chat meanwhile
+
+        chatId = data.chatId;
+        history.push({ role: "assistant", content: data.result });
 
         removeTyping();
-        history.push({ role: "assistant", content: data.result });
         addMessage("assistant", data.result);
+        loadHistory();   // refresh sidebar list
 
     } catch (error) {
         if (mySession !== session) return;
@@ -285,6 +289,7 @@ $("new-chat-btn").addEventListener("click", () => {
     controller = null;
     busy = false;
     history = [];
+    chatId = null;
 
     messages.replaceChildren(welcomeTemplate.cloneNode(true));
 
@@ -295,9 +300,52 @@ $("new-chat-btn").addEventListener("click", () => {
     resetSendButton();
 
     setSidebar(false);
+    loadHistory();
     input.focus();
 });
 
+
+
+// ---------- Chat history (MongoDB) ----------
+
+const historyList = document.querySelector(".chat-history");
+
+async function loadHistory() {
+    try {
+        const res = await fetch("/api/chats");
+        const chats = await res.json();
+
+        historyList.replaceChildren();
+        chats.forEach(chat => {
+            const item = document.createElement("button");
+            item.type = "button";
+            item.className = "history-item";
+            if (chat._id === chatId) item.classList.add("is-active");
+            item.textContent = chat.title;
+            item.onclick = () => openChat(chat._id);
+            historyList.append(item);
+        });
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function openChat(id) {
+    if (busy) return;
+
+    const res = await fetch(`/api/chats/${id}`);
+    const chat = await res.json();
+
+    session++;
+    chatId = chat._id;
+    history = chat.messages.map(m => ({ role: m.role, content: m.content }));
+
+    messages.replaceChildren();
+    history.forEach(m => addMessage(m.role, m.content));
+
+    setSidebar(false);
+    loadHistory();
+}
 
 // ---------- Sidebar (mobile drawer) ----------
 
@@ -334,3 +382,4 @@ prefersDark.addEventListener("change", syncThemeButton);
 
 syncThemeButton();
 resetSendButton();
+loadHistory();
