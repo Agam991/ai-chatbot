@@ -5,14 +5,14 @@ main focus is on backEnd learning. while frontEnd is done via taking the help.
 
 The project has a ChatGPT-style interface and uses a Node.js/Express backend to communicate with an AI model through the google/gemini API.
 
+reference-> 
+https://ai.google.dev/gemini-api/docs
+
 ## Preview
 
 ![AI Chatbot Dark Mode](screenshots/chatbot-dark.png)
 
 ![AI Chatbot Conversation](screenshots/chatbot-conversation.png)
-
-reference-> 
-https://ai.google.dev/gemini-api/docs
 
 ## Features
 
