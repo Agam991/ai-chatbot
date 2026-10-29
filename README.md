@@ -2,7 +2,7 @@
 
 A ChatGPT-style chatbot built to learn backend development. The Node.js/Express backend is written by me. The frontend in `public/` is AI-generated, so the focus of this project is the server side: routing, calling an external AI API, handling conversation state, and storing data in a database.
 
-## Preview
+**Try chatbot:** [chat Online](https://ai-chatbot-ircc.onrender.com/)
 
 ![Dark mode](screenshots/chatbot-dark.png)
 
